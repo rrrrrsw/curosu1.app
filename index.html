@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VR金魚すくい</title>
+    <!-- Tailwind CSS CDNを読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを適用 */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* ビデオ要素のオブジェクトフィットをカバーに設定 */
+        #video {
+            object-fit: cover; /* カメラ映像が要素全体を覆うように */
+        }
+        /* 背景画像が固定され、画面全体を覆うように設定 */
+        .background-image {
+            /* ここに、ご希望の背景画像の直接URLを貼り付けてください。 */
+            /* 例: background-image: url('https://example.com/your-background-image.jpg'); */
+            /* 現在は、テスト用の汎用プレースホルダー画像です。 */
+            background-image: url(https://user0514.cdnw.net/shared/img/thumb/15041206017101_TP_V4.jpg?w=500,h=auto); 
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: brightness(0.7); /* 背景画像を少し暗くして、テキストの可読性を上げる */
+        }
+        /* 写真の枠のプレースホルダー背景 */
+        .photo-frame-placeholder {
+            background-color: #e2e8f0; /* bg-gray-200 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b; /* text-gray-500 */
+            font-size: 0.875rem; /* text-sm */
+            border: 2px dashed #94a3b8; /* border-gray-400 */
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 relative">
+    <!-- 背景画像コンテナ -->
+    <div class="fixed inset-0 z-0 background-image"></div>
+
+    <!-- メインコンテンツコンテナ (背景画像の上に表示される) -->
+    <div class="relative z-10 w-full max-w-md flex flex-col items-center">
+        <h1 class="text-4xl font-bold text-white mb-8 mt-4 text-center drop-shadow-lg">VR金魚すくい</h1>
+
+        <!-- ユーザーID表示エリアは公開図鑑のため削除 -->
+        <!-- <div class="bg-yellow-100 text-yellow-800 text-sm font-medium px-4 py-2 rounded-full mb-4 shadow-md">
+            あなたの図鑑ID: <span id="userIdDisplay" class="font-bold">読み込み中...</span>
+        </div> -->
+
+        <!-- カメラと撮影ボタンのセクション -->
+        <div id="camera-section" class="w-full bg-white bg-opacity-80 rounded-xl shadow-lg p-4 mb-8 flex flex-col items-center">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">カメラ</h2>
+            <!-- カメラ映像を表示するビデオ要素 -->
+            <video id="video" autoplay playsinline class="w-full h-64 bg-gray-200 rounded-lg mb-4 border-2 border-blue-400"></video>
+            <!-- 撮影用の一時的なキャンバス (非表示) -->
+            <canvas id="canvas" class="hidden"></canvas> 
+            <!-- 撮影ボタン -->
+            <button id="captureButton" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                撮影する
+            </button>
+            <!-- カメラエラーメッセージ表示エリア -->
+            <p id="cameraErrorMessage" class="text-red-600 mt-2 hidden"></p>
+        </div>
+
+        <!-- 図鑑セクション -->
+        <div id="gallery-section" class="w-full bg-white bg-opacity-80 rounded-xl shadow-lg p-4 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4 text-center">赤と青の金魚を捕まえよう！</h2>
+            <!-- 撮影した金魚の画像が表示される枠 -->
+            <div id="kingyo-frames" class="grid grid-cols-2 gap-4">
+                <div id="photoFrame1" class="w-full h-40 rounded-lg shadow-md overflow-hidden relative photo-frame-placeholder">
+                    <span class="text-sm text-gray-500">写真1</span>
+                    <img src="" alt="金魚の写真1" class="absolute inset-0 w-full h-full object-cover hidden">
+                </div>
+                <div id="photoFrame2" class="w-full h-40 rounded-lg shadow-md overflow-hidden relative photo-frame-placeholder">
+                    <span class="text-sm text-gray-500">写真2</span>
+                    <img src="" alt="金魚の写真2" class="absolute inset-0 w-full h-full object-cover hidden">
+                </div>
+            </div>
+            <p id="noImagesMessage" class="text-gray-500 text-center mt-4 hidden">まだ金魚が登録されていません。</p>
+            
+            <!-- 図鑑リセットボタン -->
+            <div class="flex justify-center mt-6">
+                <button id="resetGalleryButton" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                    図鑑をリセット
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebaseのインポート
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // DOM要素の取得
+        const video = document.getElementById('video');
+        const captureButton = document.getElementById('captureButton');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const photoFrame1 = document.getElementById('photoFrame1');
+        const photoFrame2 = document.getElementById('photoFrame2');
+        const img1 = photoFrame1.querySelector('img');
+        const img2 = photoFrame2.querySelector('img');
+        const span1 = photoFrame1.querySelector('span');
+        const span2 = photoFrame2.querySelector('span');
+        const cameraErrorMessage = document.getElementById('cameraErrorMessage');
+        const noImagesMessage = document.getElementById('noImagesMessage');
+        const resetGalleryButton = document.getElementById('resetGalleryButton');
+        // const userIdDisplay = document.getElementById('userIdDisplay'); // 公開図鑑のため削除
+
+        // Firebase初期化と認証
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let currentUserId = null; // 現在のユーザーID (認証用には必要だが、データパスには使用しない)
+        let unsubscribeSnapshot = null; // onSnapshotの購読解除関数
+
+        // 認証状態の変更を監視
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUserId = user.uid;
+                // userIdDisplay.textContent = currentUserId; // 公開図鑑のため削除
+                console.log('User authenticated:', currentUserId);
+                // ユーザー認証後、Firestoreのリスナーを設定
+                setupFirestoreListener();
+            } else {
+                // 認証トークンがあればカスタム認証、なければ匿名認証
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                        console.log('Signed in with custom token.');
+                    } catch (error) {
+                        console.error('Error signing in with custom token:', error);
+                        await signInAnonymously(auth);
+                        console.log('Signed in anonymously due to custom token error.');
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                    console.log('Signed in anonymously.');
+                }
+            }
+        });
+
+        // Firestoreリスナーの設定 (公開コレクション用)
+        function setupFirestoreListener() {
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot(); // 既存のリスナーがあれば解除
+            }
+            // 公開コレクションのパスに変更
+            const kingyoCollectionRef = collection(db, `artifacts/${appId}/public/data/kingyoImages`);
+            const q = query(kingyoCollectionRef); // orderByはJavaScriptで処理するためここでは使用しない
+
+            unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+                const images = [];
+                snapshot.forEach(doc => {
+                    images.push({ id: doc.id, ...doc.data() });
+                });
+                // 日付でソート（新しいものが後ろに来るように）
+                images.sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                
+                // 最新の2枚のみを保持
+                const capturedImages = images.slice(-2); 
+                console.log('Firestore public data updated. Current images:', capturedImages.map(img => img.id));
+                renderGallery(capturedImages); // ギャラリーを再レンダリング
+            }, (error) => {
+                console.error('Error listening to Firestore:', error);
+                cameraErrorMessage.textContent = '図鑑データの読み込みに失敗しました。ネットワーク接続を確認してください。';
+                cameraErrorMessage.classList.remove('hidden');
+            });
+        }
+
+        // --- カメラの起動処理 ---
+        window.onload = () => {
+            console.log('Window loaded. Attempting to start camera...');
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => {
+                    console.log('Camera stream obtained successfully.');
+                    video.srcObject = stream;
+                    video.play();
+                    cameraErrorMessage.classList.add('hidden');
+                })
+                .catch(err => {
+                    console.error('カメラのアクセスに失敗しました:', err);
+                    cameraErrorMessage.textContent = 'カメラにアクセスできませんでした。ブラウザの設定でカメラの使用を許可してください。';
+                    cameraErrorMessage.classList.remove('hidden');
+                    captureButton.disabled = true;
+                    captureButton.classList.add('opacity-50', 'cursor-not-allowed');
+                });
+            // loadGallery() はonAuthStateChanged内でsetupFirestoreListenerが呼び出す
+        };
+
+        // --- 撮影ボタンのクリックイベントリスナー ---
+        captureButton.addEventListener('click', async () => {
+            console.log('Capture button clicked.');
+            if (!currentUserId) {
+                console.warn('User not authenticated yet. Please wait.');
+                cameraErrorMessage.textContent = 'ユーザー認証を待っています...';
+                cameraErrorMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                console.log('Video ready for capture.');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageDataURL = canvas.toDataURL('image/png');
+                console.log('Image captured.');
+
+                await saveImageToFirestore(imageDataURL);
+            } else {
+                console.warn('カメラの準備ができていません。しばらくお待ちください。');
+            }
+        });
+
+        // --- Firestoreへの画像保存関数 (公開コレクション用) ---
+        async function saveImageToFirestore(imageDataURL) {
+            if (!currentUserId) {
+                console.error('Cannot save image: userId is null.');
+                return;
+            }
+
+            // 公開コレクションのパスに変更
+            const kingyoCollectionRef = collection(db, `artifacts/${appId}/public/data/kingyoImages`);
+
+            try {
+                // 現在の画像数を取得
+                const querySnapshot = await getDocs(kingyoCollectionRef);
+                const currentImages = [];
+                querySnapshot.forEach(doc => {
+                    currentImages.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // 日付でソートし、最も古いものを特定
+                currentImages.sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+
+                if (currentImages.length >= 2) {
+                    // 最も古い画像を削除
+                    const oldestImage = currentImages[0];
+                    await deleteDoc(doc(db, `artifacts/${appId}/public/data/kingyoImages`, oldestImage.id));
+                    console.log('Deleted oldest image from Firestore:', oldestImage.id);
+                }
+
+                // 新しい画像をFirestoreに追加
+                await addDoc(kingyoCollectionRef, {
+                    dataURL: imageDataURL,
+                    createdAt: new Date() // タイムスタンプを追加
+                });
+                console.log('New image added to Firestore.');
+
+            } catch (e) {
+                console.error('Error saving image to Firestore:', e);
+                cameraErrorMessage.textContent = '写真の保存に失敗しました。';
+                cameraErrorMessage.classList.remove('hidden');
+            }
+        }
+
+        // --- ギャラリーをレンダリングする関数 ---
+        // 引数としてcapturedImagesを受け取るように変更
+        function renderGallery(imagesToRender) {
+            // まずは両方の枠をリセット
+            img1.src = '';
+            img1.classList.add('hidden');
+            span1.classList.remove('hidden');
+            photoFrame1.classList.add('photo-frame-placeholder');
+
+            img2.src = '';
+            img2.classList.add('hidden');
+            span2.classList.remove('hidden');
+            photoFrame2.classList.add('photo-frame-placeholder');
+
+            noImagesMessage.classList.remove('hidden'); // デフォルトで表示しておく
+
+            if (imagesToRender.length > 0) {
+                noImagesMessage.classList.add('hidden'); // 画像があれば非表示
+
+                // 1枚目の画像を表示
+                img1.src = imagesToRender[0].dataURL;
+                img1.classList.remove('hidden');
+                span1.classList.add('hidden');
+                photoFrame1.classList.remove('photo-frame-placeholder');
+            }
+            if (imagesToRender.length > 1) {
+                // 2枚目の画像を表示
+                img2.src = imagesToRender[1].dataURL;
+                img2.classList.remove('hidden');
+                span2.classList.add('hidden');
+                photoFrame2.classList.remove('photo-frame-placeholder');
+            }
+            console.log('Gallery rendered.');
+        }
+
+        // --- 図鑑をリセットするボタンのイベントリスナー (公開コレクション用) ---
+        resetGalleryButton.addEventListener('click', async () => {
+            console.log('Reset gallery button clicked.');
+            if (!currentUserId) {
+                console.warn('User not authenticated for reset.');
+                return;
+            }
+
+            if (confirm('図鑑のすべての金魚を削除してもよろしいですか？')) {
+                try {
+                    // 公開コレクションのパスに変更
+                    const kingyoCollectionRef = collection(db, `artifacts/${appId}/public/data/kingyoImages`);
+                    const querySnapshot = await getDocs(kingyoCollectionRef);
+                    
+                    const deletePromises = [];
+                    querySnapshot.forEach((docItem) => {
+                        deletePromises.push(deleteDoc(doc(db, `artifacts/${appId}/public/data/kingyoImages`, docItem.id)));
+                    });
+                    await Promise.all(deletePromises); // すべての削除が完了するのを待つ
+                    
+                    console.log('All images deleted from Firestore.');
+                    // onSnapshotが自動的にUIを更新するため、renderGallery()は不要
+                } catch (e) {
+                    console.error('Error resetting gallery:', e);
+                    cameraErrorMessage.textContent = '図鑑のリセットに失敗しました。';
+                    cameraErrorMessage.classList.remove('hidden');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
