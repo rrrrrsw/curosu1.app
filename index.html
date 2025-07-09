@@ -6,6 +6,8 @@
     <title>VR金魚すくい</title>
     <!-- Tailwind CSS CDNを読み込み -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome CDNを読み込み (ローディングアイコン用) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         /* Interフォントを適用 */
         body {
@@ -36,6 +38,21 @@
             font-size: 0.875rem; /* text-sm */
             border: 2px dashed #94a3b8; /* border-gray-400 */
         }
+        /* ローディングスピナーのCSS */
+        .loader {
+            border: 4px solid #f3f3f3; /* Light grey */
+            border-top: 4px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-4 relative">
@@ -45,11 +62,6 @@
     <!-- メインコンテンツコンテナ (背景画像の上に表示される) -->
     <div class="relative z-10 w-full max-w-md flex flex-col items-center">
         <h1 class="text-4xl font-bold text-white mb-8 mt-4 text-center drop-shadow-lg">VR金魚すくい</h1>
-
-        <!-- ユーザーID表示エリアは公開図鑑のため削除 -->
-        <!-- <div class="bg-yellow-100 text-yellow-800 text-sm font-medium px-4 py-2 rounded-full mb-4 shadow-md">
-            あなたの図鑑ID: <span id="userIdDisplay" class="font-bold">読み込み中...</span>
-        </div> -->
 
         <!-- カメラと撮影ボタンのセクション -->
         <div id="camera-section" class="w-full bg-white bg-opacity-80 rounded-xl shadow-lg p-4 mb-8 flex flex-col items-center">
@@ -71,13 +83,23 @@
             <h2 class="text-2xl font-semibold text-gray-700 mb-4 text-center">赤と青の金魚を捕まえよう！</h2>
             <!-- 撮影した金魚の画像が表示される枠 -->
             <div id="kingyo-frames" class="grid grid-cols-2 gap-4">
-                <div id="photoFrame1" class="w-full h-40 rounded-lg shadow-md overflow-hidden relative photo-frame-placeholder">
+                <!-- 写真枠1 -->
+                <div id="photoFrame1" class="w-full h-40 rounded-lg shadow-md overflow-hidden relative photo-frame-placeholder flex-col">
                     <span class="text-sm text-gray-500">写真1</span>
                     <img src="" alt="金魚の写真1" class="absolute inset-0 w-full h-full object-cover hidden">
+                    <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black to-transparent text-white text-xs hidden" id="desc1"></div>
+                    <button class="mt-2 bg-green-500 hover:bg-green-600 text-white text-sm py-1 px-2 rounded-full shadow-md transition duration-300 hidden" id="identifyBtn1">
+                        ✨金魚を識別✨
+                    </button>
                 </div>
-                <div id="photoFrame2" class="w-full h-40 rounded-lg shadow-md overflow-hidden relative photo-frame-placeholder">
+                <!-- 写真枠2 -->
+                <div id="photoFrame2" class="w-full h-40 rounded-lg shadow-md overflow-hidden relative photo-frame-placeholder flex-col">
                     <span class="text-sm text-gray-500">写真2</span>
                     <img src="" alt="金魚の写真2" class="absolute inset-0 w-full h-full object-cover hidden">
+                    <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black to-transparent text-white text-xs hidden" id="desc2"></div>
+                    <button class="mt-2 bg-green-500 hover:bg-green-600 text-white text-sm py-1 px-2 rounded-full shadow-md transition duration-300 hidden" id="identifyBtn2">
+                        ✨金魚を識別✨
+                    </button>
                 </div>
             </div>
             <p id="noImagesMessage" class="text-gray-500 text-center mt-4 hidden">まだ金魚が登録されていません。</p>
@@ -95,7 +117,7 @@
         // Firebaseのインポート
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, deleteDoc, doc, getDocs, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // DOM要素の取得
         const video = document.getElementById('video');
@@ -108,10 +130,13 @@
         const img2 = photoFrame2.querySelector('img');
         const span1 = photoFrame1.querySelector('span');
         const span2 = photoFrame2.querySelector('span');
+        const desc1 = document.getElementById('desc1');
+        const desc2 = document.getElementById('desc2');
+        const identifyBtn1 = document.getElementById('identifyBtn1');
+        const identifyBtn2 = document.getElementById('identifyBtn2');
         const cameraErrorMessage = document.getElementById('cameraErrorMessage');
         const noImagesMessage = document.getElementById('noImagesMessage');
         const resetGalleryButton = document.getElementById('resetGalleryButton');
-        // const userIdDisplay = document.getElementById('userIdDisplay'); // 公開図鑑のため削除
 
         // Firebase初期化と認証
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -128,7 +153,6 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUserId = user.uid;
-                // userIdDisplay.textContent = currentUserId; // 公開図鑑のため削除
                 console.log('User authenticated:', currentUserId);
                 // ユーザー認証後、Firestoreのリスナーを設定
                 setupFirestoreListener();
@@ -165,7 +189,12 @@
                     images.push({ id: doc.id, ...doc.data() });
                 });
                 // 日付でソート（新しいものが後ろに来るように）
-                images.sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                images.sort((a, b) => {
+                    // createdAtがTimestampオブジェクトの場合と、null/undefinedの場合を考慮
+                    const dateA = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(0);
+                    const dateB = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(0);
+                    return dateA - dateB;
+                });
                 
                 // 最新の2枚のみを保持
                 const capturedImages = images.slice(-2); 
@@ -241,7 +270,11 @@
                 });
                 
                 // 日付でソートし、最も古いものを特定
-                currentImages.sort((a, b) => a.createdAt.toDate() - b.createdAt.toDate());
+                currentImages.sort((a, b) => {
+                    const dateA = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(0);
+                    const dateB = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(0);
+                    return dateA - dateB;
+                });
 
                 if (currentImages.length >= 2) {
                     // 最も古い画像を削除
@@ -253,7 +286,9 @@
                 // 新しい画像をFirestoreに追加
                 await addDoc(kingyoCollectionRef, {
                     dataURL: imageDataURL,
-                    createdAt: new Date() // タイムスタンプを追加
+                    createdAt: serverTimestamp(), // Firestoreのサーバータイムスタンプを使用
+                    identifiedType: '', // 初期値として空を設定
+                    description: ''     // 初期値として空を設定
                 });
                 console.log('New image added to Firestore.');
 
@@ -267,36 +302,150 @@
         // --- ギャラリーをレンダリングする関数 ---
         // 引数としてcapturedImagesを受け取るように変更
         function renderGallery(imagesToRender) {
-            // まずは両方の枠をリセット
-            img1.src = '';
-            img1.classList.add('hidden');
-            span1.classList.remove('hidden');
-            photoFrame1.classList.add('photo-frame-placeholder');
+            // まずは両方の枠をリセットして非表示に
+            const frames = [
+                { img: img1, span: span1, desc: desc1, identifyBtn: identifyBtn1, frameElem: photoFrame1 },
+                { img: img2, span: span2, desc: desc2, identifyBtn: identifyBtn2, frameElem: photoFrame2 }
+            ];
 
-            img2.src = '';
-            img2.classList.add('hidden');
-            span2.classList.remove('hidden');
-            photoFrame2.classList.add('photo-frame-placeholder');
+            frames.forEach(frame => {
+                frame.img.src = '';
+                frame.img.classList.add('hidden');
+                frame.span.classList.remove('hidden');
+                frame.desc.classList.add('hidden');
+                frame.desc.textContent = '';
+                frame.identifyBtn.classList.add('hidden');
+                frame.identifyBtn.textContent = '✨金魚を識別✨'; // ボタンのテキストをリセット
+                frame.identifyBtn.disabled = false; // ボタンを有効化
+                frame.frameElem.classList.add('photo-frame-placeholder'); // プレースホルダー背景に戻す
+                
+                // 既存のイベントリスナーを削除し、新しいボタンに付け替える
+                const oldBtn = frame.identifyBtn;
+                const newBtn = oldBtn.cloneNode(true);
+                oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+                // グローバル変数への参照を更新 (重要)
+                if (frame === frames[0]) identifyBtn1 = newBtn;
+                else identifyBtn2 = newBtn;
+            });
 
             noImagesMessage.classList.remove('hidden'); // デフォルトで表示しておく
 
             if (imagesToRender.length > 0) {
                 noImagesMessage.classList.add('hidden'); // 画像があれば非表示
 
-                // 1枚目の画像を表示
-                img1.src = imagesToRender[0].dataURL;
-                img1.classList.remove('hidden');
-                span1.classList.add('hidden');
-                photoFrame1.classList.remove('photo-frame-placeholder');
-            }
-            if (imagesToRender.length > 1) {
-                // 2枚目の画像を表示
-                img2.src = imagesToRender[1].dataURL;
-                img2.classList.remove('hidden');
-                span2.classList.add('hidden');
-                photoFrame2.classList.remove('photo-frame-placeholder');
+                imagesToRender.forEach((image, index) => {
+                    const frame = frames[index];
+                    if (frame) {
+                        frame.img.src = image.dataURL;
+                        frame.img.classList.remove('hidden');
+                        frame.span.classList.add('hidden');
+                        frame.frameElem.classList.remove('photo-frame-placeholder'); // プレースホルダー背景を削除
+
+                        // 識別結果があれば表示
+                        if (image.identifiedType && image.description) {
+                            frame.desc.textContent = `${image.identifiedType}: ${image.description}`;
+                            frame.desc.classList.remove('hidden');
+                            frame.identifyBtn.classList.add('hidden'); // 識別済みならボタンを非表示
+                        } else {
+                            frame.identifyBtn.classList.remove('hidden'); // 識別結果がなければボタンを表示
+                        }
+
+                        // 識別ボタンのイベントリスナーを設定
+                        frame.identifyBtn.onclick = async () => {
+                            frame.identifyBtn.textContent = '識別中...';
+                            frame.identifyBtn.disabled = true;
+                            frame.identifyBtn.innerHTML = '識別中... <span class="loader"></span>'; // ローディングスピナー
+                            frame.desc.textContent = ''; // 前の識別結果をクリア
+                            frame.desc.classList.add('hidden'); // 結果表示を一時的に隠す
+
+                            try {
+                                const result = await identifyGoldfish(image.dataURL);
+                                if (result) {
+                                    frame.desc.textContent = `${result.type}: ${result.description}`;
+                                    frame.desc.classList.remove('hidden');
+                                    // Firestoreのドキュメントを更新
+                                    await updateDoc(doc(db, `artifacts/${appId}/public/data/kingyoImages`, image.id), {
+                                        identifiedType: result.type,
+                                        description: result.description
+                                    });
+                                } else {
+                                    frame.desc.textContent = '識別できませんでした。';
+                                    frame.desc.classList.remove('hidden');
+                                }
+                            } catch (error) {
+                                console.error('金魚識別エラー:', error);
+                                frame.desc.textContent = '識別中にエラーが発生しました。';
+                                frame.desc.classList.remove('hidden');
+                            } finally {
+                                // FirestoreのonSnapshotが更新を検知してrenderGalleryを呼び出すため、
+                                // ここでボタンの状態をリセットする必要はない（自動的に更新される）
+                                // ただし、エラー時などは手動でリセットすることも検討
+                                // frame.identifyBtn.textContent = '✨金魚を識別✨';
+                                // frame.identifyBtn.disabled = false;
+                            }
+                        };
+                    }
+                });
             }
             console.log('Gallery rendered.');
+        }
+
+        // --- Gemini APIを呼び出して金魚を識別する関数 ---
+        async function identifyGoldfish(imageDataURL) {
+            const base64ImageData = imageDataURL.split(',')[1]; // "data:image/png;base64," の部分を削除
+
+            const prompt = "この金魚の画像に写っている金魚の種類は何ですか？その特徴を簡潔に日本語で説明してください。もし金魚でない場合は、「金魚ではありません」と答えてください。回答はJSON形式で提供してください。例: { \"type\": \"琉金\", \"description\": \"丸い体型と長い尾ひれが特徴の金魚です。\" } もし金魚でない場合は、{ \"type\": \"金魚ではありません\", \"description\": \"\" } としてください。";
+            
+            let chatHistory = [];
+            chatHistory.push({ 
+                role: "user", 
+                parts: [
+                    { text: prompt },
+                    { inlineData: { mimeType: "image/png", data: base64ImageData } }
+                ] 
+            });
+
+            const payload = { 
+                contents: chatHistory,
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "type": { "type": "STRING" },
+                            "description": { "type": "STRING" }
+                        },
+                        "propertyOrdering": ["type", "description"]
+                    }
+                }
+            };
+            
+            const apiKey = ""; // Canvas環境で自動的に提供されます
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    console.log('Gemini API raw response JSON:', jsonString);
+                    const parsedJson = JSON.parse(jsonString);
+                    return parsedJson;
+                } else {
+                    console.warn('Gemini API did not return expected content structure:', result);
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                throw error;
+            }
         }
 
         // --- 図鑑をリセットするボタンのイベントリスナー (公開コレクション用) ---
