@@ -8,7 +8,10 @@
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
-      background: url(https://user0514.cdnw.net/shared/img/thumb/15041206017101_TP_V4.jpg?w=500,h=auto) no-repeat center center fixed;
+      /* 背景の fixed を外しスマホ対応 */
+      background-image: url(https://user0514.cdnw.net/shared/img/thumb/15041206017101_TP_V4.jpg?w=500,h=auto);
+      background-repeat: no-repeat;
+      background-position: center center;
       background-size: cover;
       color: #333;
       position: relative;
@@ -116,18 +119,16 @@
 
     const STORAGE_KEY = 'camera-app-photos';
 
-    // カメラ起動（背面優先）
     async function startCamera() {
       try {
         const constraints = {
           video: {
-            facingMode: { exact: "environment" } // 背面カメラ優先
+            facingMode: { exact: "environment" }
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
       } catch (err) {
-        // 背面が使えなかった場合はフロントカメラにfallback
         try {
           const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
           video.srcObject = fallbackStream;
@@ -185,7 +186,6 @@
       }
     });
 
-    // 初期化
     startCamera();
     renderGallery();
   </script>
