@@ -10,11 +10,11 @@
     body {
       font-family: 'Kosugi Maru', sans-serif;
       margin: 20px;
-      background-image: url(https://user0514.cdnw.net/shared/img/thumb/PAK86_omaturinokingyosukui_TP_V.jpg); /* ← 背景画像指定 */
+      background-image: url(https://user0514.cdnw.net/shared/img/thumb/PAK86_omaturinokingyosukui_TP_V.jpg); /* 背景画像 */
       background-size: cover;
       background-position: center center;
       background-repeat: no-repeat;
-      background-attachment: scroll; /* ← fixedを使わずスクロール */
+      background-attachment: scroll;
       color: #333;
       min-height: 100vh;
     }
@@ -30,7 +30,7 @@
 
     h1 {
       text-align: center;
-      margin-bottom: 30px; /* タイトル下のスペース拡大 */
+      margin-bottom: 30px; /* タイトルと説明文の間にスペース */
     }
 
     p.description {
@@ -124,11 +124,12 @@
     const photosDiv = document.getElementById('photos');
     const STORAGE_KEY = 'camera-app-photos';
 
+    // カメラ起動
     async function startCamera() {
       try {
         const constraints = {
           video: {
-            facingMode: { exact: "environment" }
+            facingMode: { exact: "environment" } // 外カメラ優先
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -143,15 +144,18 @@
       }
     }
 
+    // 図鑑読み込み
     function loadPhotos() {
       const data = localStorage.getItem(STORAGE_KEY);
       return data ? JSON.parse(data) : [];
     }
 
+    // 図鑑保存
     function savePhotos(photos) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
     }
 
+    // 図鑑表示
     function renderGallery() {
       const photos = loadPhotos();
       photosDiv.innerHTML = '';
@@ -166,12 +170,14 @@
       });
     }
 
+    // 写真を撮る
     captureBtn.addEventListener('click', () => {
       const photos = loadPhotos();
       if (photos.length >= 8) {
         alert('図鑑は最大8枚まで登録可能です。');
         return;
       }
+
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -184,13 +190,25 @@
       renderGallery();
     });
 
+    // リセット処理（カメラ再起動）
     resetBtn.addEventListener('click', () => {
       if (confirm('図鑑の写真をすべて削除します。よろしいですか？')) {
+        // カメラを停止
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach(track => track.stop());
+          video.srcObject = null;
+        }
+
+        // データ削除＆再描画
         localStorage.removeItem(STORAGE_KEY);
         renderGallery();
+
+        // カメラ再起動
+        startCamera();
       }
     });
 
+    // 初期化
     startCamera();
     renderGallery();
   </script>
