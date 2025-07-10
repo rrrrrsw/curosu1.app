@@ -5,25 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VR金魚すくい</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap');
+
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Kosugi Maru', sans-serif;
       margin: 20px;
-      /* 背景の fixed を外しスマホ対応 */
-      background-image: url(https://s.widget-club.com/images/YyiR86zpwIMIfrCZoSs4ulVD9RF3/ebb4a81a93211cff82c633aa4fd7bc6c/1bd7e97832b6c91741308a8dd89adadf.jpg?q=70&w=500);
-      background-repeat: no-repeat;
-      background-position: center center;
+      background-image: url(https://user0514.cdnw.net/shared/img/thumb/PAK86_omaturinokingyosukui_TP_V.jpg); /* ← 背景画像指定 */
       background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-attachment: scroll; /* ← fixedを使わずスクロール */
       color: #333;
-      position: relative;
       min-height: 100vh;
     }
-    body::before {
-      content: "";
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: rgba(255, 255, 255, 0.7);
-      z-index: -1;
-    }
+
     .project-name {
       text-align: center;
       font-size: 1.1em;
@@ -32,19 +27,23 @@
       margin-bottom: 5px;
       letter-spacing: 1px;
     }
+
     h1 {
       text-align: center;
-      margin-bottom: 5px;
+      margin-bottom: 30px; /* タイトル下のスペース拡大 */
     }
+
     p.description {
       text-align: center;
       font-size: 1.2em;
-      margin-top: -5px;
+      margin-top: 0;
       margin-bottom: 20px;
     }
+
     #camera-section {
       text-align: center;
     }
+
     video {
       width: 320px;
       height: 240px;
@@ -52,6 +51,7 @@
       border-radius: 4px;
       background: #000;
     }
+
     button {
       margin: 10px 5px 0 5px;
       padding: 10px 20px;
@@ -59,25 +59,30 @@
       cursor: pointer;
       border-radius: 5px;
       border: none;
-      background-color: #007bff;
+      background-color: #e63946;
       color: white;
       transition: background-color 0.3s;
     }
+
     button:hover {
-      background-color: #0056b3;
+      background-color: #b71c1c;
     }
+
     #gallery {
       margin-top: 30px;
     }
+
     #gallery h2 {
       text-align: center;
     }
+
     #photos {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       justify-content: center;
     }
+
     .photo-item {
       border: 1px solid #ccc;
       border-radius: 5px;
@@ -86,6 +91,7 @@
       height: 90px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+
     .photo-item img {
       width: 100%;
       height: 100%;
@@ -116,7 +122,6 @@
     const captureBtn = document.getElementById('capture-btn');
     const resetBtn = document.getElementById('reset-btn');
     const photosDiv = document.getElementById('photos');
-
     const STORAGE_KEY = 'camera-app-photos';
 
     async function startCamera() {
