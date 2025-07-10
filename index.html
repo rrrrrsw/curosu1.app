@@ -5,32 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VR金魚すくい</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap');
+
+    /* 背景動画 */
+    #bg-video {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
 
     body {
-      font-family: 'Kosugi Maru', sans-serif;
+      font-family: 'Zen Maru Gothic', sans-serif;
       margin: 20px;
-      background-image: url(https://user0514.cdnw.net/shared/img/thumb/PAK86_omaturinokingyosukui_TP_V.jpg); /* 背景画像 */
-      background-size: cover;
-      background-position: center center;
-      background-repeat: no-repeat;
-      background-attachment: scroll;
-      color: #333;
+      color: #222;
       min-height: 100vh;
+      position: relative;
+      z-index: 1;
+      background-color: rgba(255, 255, 255, 0.7);
     }
 
     .project-name {
       text-align: center;
       font-size: 1.1em;
       font-weight: bold;
-      color: #444;
       margin-bottom: 5px;
       letter-spacing: 1px;
     }
 
     h1 {
       text-align: center;
-      margin-bottom: 30px; /* タイトルと説明文の間にスペース */
+      margin-bottom: 30px;
     }
 
     p.description {
@@ -44,10 +52,10 @@
       text-align: center;
     }
 
-    video {
+    video#video {
       width: 320px;
       height: 240px;
-      border: 2px solid #333;
+      border: 2px solid #222;
       border-radius: 4px;
       background: #000;
     }
@@ -59,13 +67,14 @@
       cursor: pointer;
       border-radius: 5px;
       border: none;
-      background-color: #e63946;
-      color: white;
+      background-color: #f78c6b;
+      color: #222;
+      font-weight: bold;
       transition: background-color 0.3s;
     }
 
     button:hover {
-      background-color: #b71c1c;
+      background-color: #e86c4f;
     }
 
     #gallery {
@@ -84,12 +93,12 @@
     }
 
     .photo-item {
-      border: 1px solid #ccc;
+      border: 1px solid #aaa;
       border-radius: 5px;
       overflow: hidden;
       width: 120px;
       height: 90px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
 
     .photo-item img {
@@ -101,6 +110,13 @@
   </style>
 </head>
 <body>
+
+  <!-- 🎥 背景動画 -->
+  <video id="bg-video" autoplay muted loop playsinline>
+    <source src="https://media.istockphoto.com/id/2157809187/ja/%E3%83%93%E3%83%87%E3%82%AA/fantastic-image-video-of-cool-summer-asia.mp4?s=mp4-640x640-is&k=20&c=q-CZzPfoKXiL1iMBUvCOtQgm37NiM1UGxFhn-AsAvTQ=" type="video/mp4" />
+    お使いのブラウザは video タグに対応していません。
+  </video>
+
   <div class="project-name">DK art cafe project</div>
   <h1>VR金魚すくい</h1>
   <p class="description">赤と青の金魚を捕まえて報酬をゲットしよう！</p>
@@ -124,7 +140,6 @@
     const photosDiv = document.getElementById('photos');
     const STORAGE_KEY = 'camera-app-photos';
 
-    // カメラ起動
     async function startCamera() {
       try {
         const constraints = {
@@ -135,6 +150,7 @@
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
       } catch (err) {
+        // fallback to any camera if environment fails
         try {
           const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
           video.srcObject = fallbackStream;
@@ -144,18 +160,15 @@
       }
     }
 
-    // 図鑑読み込み
     function loadPhotos() {
       const data = localStorage.getItem(STORAGE_KEY);
       return data ? JSON.parse(data) : [];
     }
 
-    // 図鑑保存
     function savePhotos(photos) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
     }
 
-    // 図鑑表示
     function renderGallery() {
       const photos = loadPhotos();
       photosDiv.innerHTML = '';
@@ -170,7 +183,6 @@
       });
     }
 
-    // 写真を撮る
     captureBtn.addEventListener('click', () => {
       const photos = loadPhotos();
       if (photos.length >= 8) {
@@ -190,20 +202,17 @@
       renderGallery();
     });
 
-    // リセット処理（カメラ再起動）
     resetBtn.addEventListener('click', () => {
       if (confirm('図鑑の写真をすべて削除します。よろしいですか？')) {
-        // カメラを停止
+        // カメラを一旦停止
         if (video.srcObject) {
           video.srcObject.getTracks().forEach(track => track.stop());
           video.srcObject = null;
         }
 
-        // データ削除＆再描画
+        // データ削除・再描画・再起動
         localStorage.removeItem(STORAGE_KEY);
         renderGallery();
-
-        // カメラ再起動
         startCamera();
       }
     });
