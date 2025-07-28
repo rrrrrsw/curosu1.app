@@ -7,7 +7,6 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap');
 
-    /* 背景動画 */
     #bg-video {
       position: fixed;
       top: 0;
@@ -107,15 +106,39 @@
       object-fit: cover;
       display: block;
     }
+
+    #bgm-play-btn {
+      display: block;
+      margin: 20px auto;
+      background-color: #4CAF50;
+      color: white;
+      font-weight: bold;
+      border-radius: 8px;
+      padding: 12px 30px;
+      font-size: 18px;
+    }
+
+    #bgm-play-btn:hover {
+      background-color: #45a049;
+    }
   </style>
 </head>
 <body>
 
-  <!-- 🎥 背景動画 -->
+  <!-- 背景動画（仮動画） -->
   <video id="bg-video" autoplay muted loop playsinline>
-    <source src="https://media.istockphoto.com/id/2157809187/ja/%E3%83%93%E3%83%87%E3%82%AA/fantastic-image-video-of-cool-summer-asia.mp4?s=mp4-640x640-is&k=20&c=q-CZzPfoKXiL1iMBUvCOtQgm37NiM1UGxFhn-AsAvTQ=" type="video/mp4" />
+    <source src="86245_640x360.mp4" type="video/mp4" />
     お使いのブラウザは video タグに対応していません。
   </video>
+
+  <!-- BGM再生ボタン -->
+  <button id="bgm-play-btn">🎵 BGMを再生する</button>
+
+  <!-- ローカルのbgm.mp3を読み込む -->
+  <audio id="bgm" loop>
+    <source src="bgm.mp3" type="audio/mpeg" />
+    お使いのブラウザは audio タグに対応していません。
+  </audio>
 
   <div class="project-name">DK art cafe project</div>
   <h1>VR金魚すくい</h1>
@@ -138,19 +161,15 @@
     const captureBtn = document.getElementById('capture-btn');
     const resetBtn = document.getElementById('reset-btn');
     const photosDiv = document.getElementById('photos');
-    const STORAGE_KEY = 'camera-app-photos';
+    const bgm = document.getElementById('bgm');
+    const bgmPlayBtn = document.getElementById('bgm-play-btn');
 
     async function startCamera() {
       try {
-        const constraints = {
-          video: {
-            facingMode: { exact: "environment" } // 外カメラ優先
-          }
-        };
+        const constraints = { video: { facingMode: { exact: "environment" } } };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
       } catch (err) {
-        // fallback to any camera if environment fails
         try {
           const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
           video.srcObject = fallbackStream;
@@ -161,12 +180,12 @@
     }
 
     function loadPhotos() {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const data = localStorage.getItem('camera-app-photos');
       return data ? JSON.parse(data) : [];
     }
 
     function savePhotos(photos) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
+      localStorage.setItem('camera-app-photos', JSON.stringify(photos));
     }
 
     function renderGallery() {
@@ -183,35 +202,42 @@
       });
     }
 
+    // BGM再生ボタンクリック
+    bgmPlayBtn.addEventListener('click', () => {
+      bgm.play().then(() => {
+        bgmPlayBtn.style.display = 'none'; // 再生成功したらボタン非表示
+      }).catch(err => {
+        alert('BGMの再生に失敗しました。');
+        console.error(err);
+      });
+    });
+
+    // 写真撮影
     captureBtn.addEventListener('click', () => {
       const photos = loadPhotos();
       if (photos.length >= 8) {
         alert('図鑑は最大8枚まで登録可能です。');
         return;
       }
-
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/png');
-
       photos.push(dataUrl);
       savePhotos(photos);
       renderGallery();
     });
 
+    // リセット
     resetBtn.addEventListener('click', () => {
       if (confirm('図鑑の写真をすべて削除します。よろしいですか？')) {
-        // カメラを一旦停止
         if (video.srcObject) {
           video.srcObject.getTracks().forEach(track => track.stop());
           video.srcObject = null;
         }
-
-        // データ削除・再描画・再起動
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem('camera-app-photos');
         renderGallery();
         startCamera();
       }
